@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer');
 const os = require('os');
 
 const app = express();
-const port = 3006;
+const port = 3000;
 
 app.use(express.json());
 app.use(express.static(__dirname, { index: 'testmlt.html' }));
