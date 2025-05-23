@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>공동주택 가격 조회</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        h2 { text-align: center; color: #333; } /* 제목 스타일 */
+        /* 기존 label 및 input[type="text"] 일반 스타일은 .form-row 내부 스타일로 대체되므로 주석 처리 또는 삭제 가능 */
+        /* label { display: inline-block; width: 120px; margin-bottom: 8px; font-weight: bold; } */
+        /* input[type="text"] { width: calc(100% - 130px); margin-bottom: 12px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; } */
+        button { display: block; width: 100%; background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        #results { margin-top: 20px; border: 1px solid #eee; padding: 15px; border-radius: 4px; background-color: #f9f9f9; }
+        .form-row {
+            display: flex;
+            align-items: center; /* 세로 중앙 정렬 */
+            margin-bottom: 12px;
+        }
+        .form-row > label { /* form-row 바로 아래 label에만 적용 */
+            width: 100px; /* 라벨 너비 고정 */
+            margin-bottom: 0;
+            margin-right: 10px; /* 라벨과 첫 입력요소 사이 간격 */
+            font-weight: bold;
+            flex-shrink: 0; /* 라벨 너비 고정 */
+            box-sizing: border-box;
+        }
+        .form-row select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 0;
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .form-row input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 0;
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .form-row input[type="text"]:disabled {
+            background-color: #f0f0f0;
+            color: #999;
+            cursor: not-allowed;
+            border-color: #ddd;
+        }
+        .form-row input.input-small { /* .input-small 클래스가 있는 input 필드에만 적용 */
+            width: 80px; /* 작은 입력 필드의 너비 */
+            flex-grow: 0; /* 작은 입력 필드는 늘어나지 않음 */
+            margin-right: 5px; /* 입력 필드 오른쪽 여백 */
+        }
+        .form-row input.input-medium { /* 중간 크기 입력 필드 */
+            width: 200px;
+            flex-grow: 0;
+            margin-right: 5px;
+        }
+        .input-separator {
+            margin: 0 5px; /* 구분자 좌우 여백 */
+            white-space: nowrap; /* 구분자 줄바꿈 방지 */
+        }
+        .address-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .address-row .form-row {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .address-row .form-row > label {
+            width: 100px;
+        }
+        .result-item { margin-bottom: 10px; font-size: 1.1em;}
+        .result-item strong { color: #007bff; }
+        #loading, #error { text-align: center; margin-top: 15px; padding: 10px; border-radius: 4px; }
+        #loading { background-color: #e9ecef; color: #495057;}
+        #error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1em;
+        }
+        .result-table td {
+            border: 1px solid #222;
+            padding: 4px 8px;
+            text-align: right;
+        }
+        .result-table td.apt-center {
+            text-align: center !important;
+        }
+        .result-table tr:first-child td {
+            font-weight: bold;
+        }
+        .result-table td.label {
+            background: #fafafa;
+            font-weight: bold;
+            text-align: left !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>공동주택 매매 공과금 계산기</h2>
+
+        <div>
+            <div class="address-row">
+                <div class="form-row">
+                    <label for="sido">시/도:</label>
+                    <input type="text" id="sido" name="sido" required>
+                </div>
+                <div class="form-row">
+                    <label for="sigugun">시/군/구:</label>
+                    <input type="text" id="sigugun" name="sigugun" required>
+                </div>
+            </div>
+
+            <div class="address-row">
+                <div class="form-row">
+                    <label for="eupmyeondong">읍/면/동/리:</label>
+                    <input type="text" id="eupmyeondong" name="eupmyeondong" required>
+                </div>
+                <div class="form-row">
+                    <label for="bun1">번지:</label>
+                    <input type="text" id="bun1" name="bun1" value="" class="input-small">
+                    <span class="input-separator">-</span>
+                    <input type="text" id="bun2" name="bun2" value="" class="input-small" style="margin-right: 0;">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label for="dong">아파트:</label>
+                <input type="text" id="dong" name="dong" value="" class="input-small">
+                <span class="input-separator">동</span>
+                <label style="margin-left: 5px;">
+                    <input type="checkbox" id="noDong" name="noDong"> 동번호없음
+                </label>
+                <input type="text" id="hosu" name="hosu" value="" class="input-small" style="margin-left: 5px;">
+                <span class="input-separator">호</span>
+            </div>
+
+            <div class="form-row">
+                <label for="purchasePrice">매매가:</label>
+                <input type="text" id="purchasePrice" name="purchasePrice" value="" class="input-medium">
+                <span class="input-separator">원</span>
+            </div>
+
+            <div class="address-row">
+                <div class="form-row">
+                    <label for="houseCount">보유주택 수:</label>
+                    <select id="houseCount" name="houseCount">
+                        <option value="1">1주택(일시적 2주택)</option>
+                        <option value="2">2주택</option>
+                        <option value="3">3주택</option>
+                        <option value="4">4주택 이상</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="isRegulatedArea" style="display:inline-block; margin-bottom:0; margin-right:8px;">조정대상지역:
+                        <span style="cursor:pointer; color:#007bff; font-weight:bold; margin-left:4px; vertical-align:middle; display:inline-block;" title="조정대상지역 안내"
+                              onclick="window.open('https://www.law.go.kr/%ED%96%89%EC%A0%95%EA%B7%9C%EC%B9%99/%EC%A1%B0%EC%A0%95%EB%8C%80%EC%83%81%EC%A7%80%EC%97%AD%20%EC%A7%80%EC%A0%95%20%ED%95%B4%EC%A0%9C/(2023-2,20230105)', '_blank', 'width=1500,height=800');">❓</span>
+                    </label>
+                    <select id="isRegulatedArea" name="isRegulatedArea" style="width:90px; min-width:70px; display:inline-block;">
+                        <option value="false">아니오</option>
+                        <option value="true">예</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="searchPrice()">조회하기</button>
+        </div>
+
+        <div id="loading" style="display:none;">
+            국토부 사이트에서 정보를 조회 중입니다... 잠시만 기다려주세요.
+        </div>
+        <div id="error" style="display:none;">
+        </div>
+
+        <div id="results" style="display:none;">
+            <h2>조회 결과</h2>
+            <table id="resultTable" class="result-table">
+                <tr>
+                    <td class="label">공동주택명(전용면적):</td>
+                    <td colspan="3" class="apt-center"><span id="resultAptName"></span></td>
+                </tr>
+                <tr>
+                    <td class="label">시가표준액:</td>
+                    <td><span id="resultPrice"></span> 원</td>
+                    <td class="label">매매가:</td>
+                    <td><span id="resultPurchasePrice"></span>원</td>
+                </tr>
+                <tr>
+                    <td class="label">채권매입액:</td>
+                    <td><span id="resultBondPurchaseAmount"></span> 원</td>
+                    <td class="label">취득세 (<span id="resultAcquisitionTaxRate"></span>%):</td>
+                    <td><span id="resultAcquisitionTax"></span>원</td>
+                </tr>
+                <tr>
+                    <td class="label">오늘의 채권할인율:</td>
+                    <td><span id="resultTodayBondRate"></span>%</td>
+                    <td class="label">지방교육세 (<span id="resultLocalEducationTaxRate"></span>%):</td>
+                    <td><span id="resultLocalEducationTax"></span>원</td>
+                </tr>
+                <tr>
+                    <td class="label">채권할인액(예상 고객부담금):</td>
+                    <td><span id="resultMyOwnAmount"></span> 원</td>
+                    <td class="label">농어촌특별세 (<span id="resultRuralSpecialTaxRate"></span>%):</td>
+                    <td><span id="resultRuralSpecialTax"></span>원</td>
+                </tr>
+                <tr>
+                    <td class="label">인지세:</td>
+                    <td><span id="resultStampTax"></span>원</td>
+                    <td class="label">지방세 소계:</td>
+                    <td><span id="resultTotalTax"></span>원</td>
+                </tr>
+                <tr>
+                    <td class="label">공과금 합계:</td>
+                    <td colspan="3"><strong><span id="resultTotalPublicCharge"></span>원</strong></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 주소 정보와 시가표준액을 캐시하기 위한 변수
+        let cachedAddress = {
+            sido: '',
+            sigugun: '',
+            eupmyeondong: '',
+            bun1: '',
+            bun2: '',
+            dong: '',
+            hosu: ''
+        };
+        let cachedData = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const dongInput = document.getElementById('dong');
+            const hosuInput = document.getElementById('hosu');
+            const purchasePriceInput = document.getElementById('purchasePrice');
+            const noDongCheckbox = document.getElementById('noDong');
+            const sidoInput = document.getElementById('sido');
+            const sigugunInput = document.getElementById('sigugun');
+
+            // 동번호없음 체크박스 이벤트 처리
+            if(noDongCheckbox) {
+                noDongCheckbox.addEventListener('change', function(event) {
+                    if(event.target.checked) {
+                        dongInput.value = ''; // 동 번호 입력값 삭제
+                        dongInput.disabled = true; // 입력 비활성화
+                        dongInput.placeholder = '동번호없음'; // 플레이스홀더 텍스트 추가
+                    } else {
+                        dongInput.disabled = false; // 입력 활성화
+                        dongInput.placeholder = ''; // 플레이스홀더 텍스트 제거
+                    }
+                });
+            }
+
+            // 숫자만 입력 가능하도록 설정
+            if(dongInput) {
+                dongInput.addEventListener('input', function(event) {
+                    event.target.value = event.target.value.replace(/[^0-9]/g, '');
+                });
+            }
+
+            if(hosuInput) {
+                hosuInput.addEventListener('input', function(event) {
+                    event.target.value = event.target.value.replace(/[^0-9]/g, '');
+                });
+            }
+
+            // 매매가 입력시 콤마 자동 입력
+            if(purchasePriceInput) {
+                purchasePriceInput.addEventListener('input', function(event) {
+                    // 숫자와 콤마만 남기고 모두 제거
+                    let value = event.target.value.replace(/[^\d,]/g, '');
+                    // 콤마 제거
+                    value = value.replace(/,/g, '');
+                    // 3자리마다 콤마 추가
+                    if(value.length > 0) {
+                        value = parseInt(value).toLocaleString();
+                    }
+                    event.target.value = value;
+                });
+            }
+
+            // 시/도 입력시 세종특별자치시 또는 세종시인 경우 시/군/구 자동 입력
+            if(sidoInput) {
+                sidoInput.addEventListener('input', function(event) {
+                    const value = event.target.value.trim();
+                    if(value === '세종특별자치시' || value === '세종시') {
+                        sigugunInput.value = '세종특별자치시';
+                    }
+                });
+            }
+        });
+
+        // 중과기준세율 계산 함수
+        function calculateSurtaxRate(houseCount, isRegulatedArea) {
+            if (isRegulatedArea) {
+                // 조정대상지역
+                if (houseCount === 1) {
+                    return 0; // 1주택자: 중과세율 없음
+                } else if (houseCount === 2) {
+                    return 0.08; // 2주택자: 8%
+                } else {
+                    return 0.12; // 3주택 이상: 12%
+                }
+            } else {
+                // 조정대상지역 외
+                if (houseCount <= 2) {
+                    return 0; // 2주택 이하: 중과세율 없음
+                } else if (houseCount === 3) {
+                    return 0.08; // 3주택자: 8%
+                } else {
+                    return 0.12; // 4주택 이상: 12%
+                }
+            }
+        }
+
+        // 지방교육세용 취득세율 계산 함수
+        function calculateLocalEducationTaxRate(price, houseCount, isRegulatedArea) {
+            if (isRegulatedArea) {
+                // 조정대상지역
+                if (houseCount >= 2) {
+                    return 0.04; // 2주택 이상: 4%
+                }
+            } else {
+                // 조정대상지역 외
+                if (houseCount >= 3) {
+                    return 0.04; // 3주택 이상: 4%
+                }
+            }
+
+            // 기본 취득세율 적용
+            if (price <= 600000000) {
+                return 0.01; // 1%
+            } else if (price <= 900000000) {
+                // (매매가액 × 2/3억원 - 3) / 100
+                const rate = (price * (2/3) / 100000000 - 3) / 100;
+                return Math.round(rate * 10000) / 10000; // 소수점 넷째자리까지 반올림
+            } else {
+                return 0.03; // 3%
+            }
+        }
+
+        // 농어촌특별세율 계산 함수
+        function calculateRuralSpecialTaxRate(houseCount, isRegulatedArea, area) {
+            // 전용면적이 85㎡ 미만인 경우 농어촌특별세 면제
+            if (parseFloat(area) < 85) {
+                return 0;
+            }
+
+            if (isRegulatedArea) {
+                // 조정대상지역
+                if (houseCount === 2) {
+                    return 0.006; // 2주택: 0.6%
+                } else if (houseCount >= 3) {
+                    return 0.01; // 3주택 이상: 1.0%
+                }
+            } else {
+                // 조정대상지역 외
+                if (houseCount === 3) {
+                    return 0.006; // 3주택: 0.6%
+                } else if (houseCount >= 4) {
+                    return 0.01; // 4주택 이상: 1.0%
+                }
+            }
+            return 0.002; // 기본: 0.2%
+        }
+
+        // 인지세 계산 함수
+        function calculateStampTax(price) {
+            if (price <= 100000000) {
+                return 0;
+            } else if (price <= 1000000000) {
+                return 150000;
+            } else {
+                return 350000;
+            }
+        }
+
+        // 특별시 및 광역시 목록
+        const specialAndMetropolitanCities = [
+            { full: '서울특별시', short: '서울' },
+            { full: '부산광역시', short: '부산' },
+            { full: '인천광역시', short: '인천' },
+            { full: '대구광역시', short: '대구' },
+            { full: '광주광역시', short: '광주' },
+            { full: '대전광역시', short: '대전' },
+            { full: '울산광역시', short: '울산' }
+        ];
+
+        // 입력값이 특별시/광역시인지 판별
+        function isSpecialOrMetropolitanCity(sido) {
+            const input = sido.replace(/\s/g, '');
+            return specialAndMetropolitanCities.some(cityObj =>
+                input.includes(cityObj.full.replace(/\s/g, '')) || input.includes(cityObj.short.replace(/\s/g, ''))
+            );
+        }
+
+        // 시가표준액 구간별 채권매입액 계산 함수
+        function calculateBondPurchaseAmount(price, sido) {
+            if (price < 20000000) {
+                return 0;
+            } else if (price < 50000000) {
+                return price * 13 / 1000;
+            } else if (price < 100000000) {
+                if (isSpecialOrMetropolitanCity(sido)) {
+                    return price * 19 / 1000;
+                } else {
+                    return price * 14 / 1000;
+                }
+            } else if (price < 160000000) {
+                if (isSpecialOrMetropolitanCity(sido)) {
+                    return price * 21 / 1000;
+                } else {
+                    return price * 16 / 1000;
+                }
+            } else if (price < 260000000) {
+                if (isSpecialOrMetropolitanCity(sido)) {
+                    return price * 23 / 1000;
+                } else {
+                    return price * 18 / 1000;
+                }
+            } else if (price < 600000000) {
+                if (isSpecialOrMetropolitanCity(sido)) {
+                    return price * 26 / 1000;
+                } else {
+                    return price * 21 / 1000;
+                }
+            } else {
+                if (isSpecialOrMetropolitanCity(sido)) {
+                    return price * 31 / 1000;
+                } else {
+                    return price * 26 / 1000;
+                }
+            }
+        }
+
+        async function searchPrice() {
+            const sido = document.getElementById('sido').value;
+            const sigugun = document.getElementById('sigugun').value;
+            const eupmyeondong = document.getElementById('eupmyeondong').value;
+            const bun1 = document.getElementById('bun1').value;
+            let bun2 = document.getElementById('bun2').value.trim();
+            const dong = document.getElementById('dong').value;
+            const hosu = document.getElementById('hosu').value;
+            const noDong = document.getElementById('noDong').checked;
+            const purchasePrice = document.getElementById('purchasePrice').value.replace(/,/g, '');
+            const houseCount = parseInt(document.getElementById('houseCount').value);
+            const isRegulatedArea = document.getElementById('isRegulatedArea').value === 'true';
+
+            // Basic validation
+            if (!sido || !sigugun || !eupmyeondong || !bun1 || !hosu || !purchasePrice) {
+                alert("시/도, 시/군/구, 읍/면/동/리, 번지(본번), 아파트 호수, 매매가는 필수 입력값입니다. 번지(부번)은 비워두면 0으로 처리됩니다.");
+                return;
+            }
+
+            // 동번호없음이 체크되지 않은 경우에만 동 번호 검증
+            if (!noDong && !dong) {
+                alert("아파트 동 번호를 입력하거나 '동번호없음'을 체크해주세요.");
+                return;
+            }
+
+            // 번지(부번)이 비어있으면 '0'으로 설정
+            if (bun2 === '') {
+                bun2 = '0';
+            }
+
+            const currentAddress = { sido, sigugun, eupmyeondong, bun1, bun2, dong, hosu, noDong };
+            const isAddressChanged = JSON.stringify(currentAddress) !== JSON.stringify(cachedAddress);
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('error').textContent = '';
+
+            try {
+                let result;
+                
+                // 주소가 변경되었거나 캐시된 가격이 없는 경우에만 서버에 요청
+                if (isAddressChanged || cachedData === null) {
+                    const response = await fetch('/search', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(currentAddress),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `조회 실패: ${response.status}`);
+                    }
+
+                    result = await response.json();
+                    
+                    // 주소와 데이터 캐시 업데이트
+                    cachedAddress = currentAddress;
+                    cachedData = {
+                        price: result.price,
+                        aptName: result.aptName,
+                        area: result.area,
+                        bondPurchaseAmount: result.bondPurchaseAmount,
+                        myOwnAmount: result.myOwnAmount,
+                        todayBondRate: result.todayBondRate
+                    };
+                } else {
+                    // 캐시된 데이터 사용
+                    result = {
+                        price: cachedData.price,
+                        aptName: cachedData.aptName,
+                        area: cachedData.area,
+                        bondPurchaseAmount: cachedData.bondPurchaseAmount,
+                        myOwnAmount: cachedData.myOwnAmount,
+                        todayBondRate: cachedData.todayBondRate
+                    };
+                }
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (result.price !== undefined) {
+                    const aptName = result.aptName || '정보 없음';
+                    const dong = result.dong ? `${result.dong}동` : '';
+                    const ho = result.ho ? `${result.ho}호` : '';
+                    const area = result.area ? `(${result.area}㎡)` : '';
+                    
+                    document.getElementById('resultAptName').textContent = `${aptName} ${dong} ${ho} ${area}`.trim();
+                    document.getElementById('resultPurchasePrice').textContent = result.price.toLocaleString();
+
+                    // 채권매입액 계산 (시가표준액 기준, 시/도 정보 필요)
+                    let bondPurchaseAmount = calculateBondPurchaseAmount(result.price, sido);
+                    bondPurchaseAmount = Math.round(bondPurchaseAmount / 1000) * 1000; // 천원 단위 반올림
+                    bondPurchaseAmount = Math.round(bondPurchaseAmount / 10000) * 10000; // 만원 단위로 표시
+                    document.getElementById('resultBondPurchaseAmount').textContent = bondPurchaseAmount.toLocaleString();
+
+                    // 세금 계산
+                    const purchasePriceInWon = parseInt(purchasePrice.replace(/,/g, ''));
+                    
+                    // 취득세 계산
+                    const basicTaxRate = calculateBasicAcquisitionTaxRate(purchasePriceInWon);
+                    const surtaxRate = calculateSurtaxRate(houseCount, isRegulatedArea);
+                    // 중과세율이 있는 경우 기본세율은 적용하지 않음
+                    const totalTaxRate = surtaxRate > 0 ? surtaxRate : basicTaxRate;
+                    const acquisitionTax = purchasePriceInWon * totalTaxRate;
+                    
+                    // 지방교육세 계산 (지방교육세용 취득세율 사용)
+                    const localEducationTaxRate = calculateLocalEducationTaxRate(purchasePriceInWon, houseCount, isRegulatedArea);
+                    const localEducationTax = purchasePriceInWon * (localEducationTaxRate * 0.5) * 0.2;
+                    
+                    // 농어촌특별세 계산 (캐시된 전용면적 사용)
+                    const ruralSpecialTaxRate = calculateRuralSpecialTaxRate(houseCount, isRegulatedArea, result.area);
+                    const ruralSpecialTax = purchasePriceInWon * ruralSpecialTaxRate;
+
+                    // 인지세 계산
+                    const stampTax = calculateStampTax(purchasePriceInWon);
+
+                    // 채권할인액(예상 고객부담금) 계산: 채권매입금액 × 오늘의 채권할인율(%) / 100
+                    let todayBondRate = parseFloat(result.todayBondRate);
+                    let myOwnAmount = Math.floor(bondPurchaseAmount * todayBondRate / 100); // 소수점 이하 절사
+                    document.getElementById('resultMyOwnAmount').textContent = myOwnAmount.toLocaleString();
+
+                    const totalTax = acquisitionTax + localEducationTax + ruralSpecialTax;
+
+                    // 합계 계산
+                    const totalPublicCharge = myOwnAmount + acquisitionTax + localEducationTax + ruralSpecialTax + stampTax;
+
+                    // 세율을 퍼센트로 표시하기 위한 포맷팅
+                    const formatTaxRate = (rate) => (rate * 100).toFixed(2);
+                    const formatLocalEducationTaxRate = (rate) => (rate * 100).toFixed(3); // 지방교육세율은 소수점 3자리까지
+
+                    document.getElementById('resultAcquisitionTaxRate').textContent = formatTaxRate(totalTaxRate);
+                    document.getElementById('resultLocalEducationTaxRate').textContent = formatLocalEducationTaxRate(localEducationTaxRate * 0.5 * 0.2);
+                    document.getElementById('resultRuralSpecialTaxRate').textContent = formatTaxRate(ruralSpecialTaxRate);
+                    document.getElementById('resultAcquisitionTax').textContent = Math.round(acquisitionTax).toLocaleString();
+                    document.getElementById('resultLocalEducationTax').textContent = Math.round(localEducationTax).toLocaleString();
+                    document.getElementById('resultRuralSpecialTax').textContent = Math.round(ruralSpecialTax).toLocaleString();
+                    document.getElementById('resultTotalTax').textContent = Math.round(totalTax).toLocaleString();
+                    document.getElementById('resultStampTax').textContent = stampTax.toLocaleString();
+                    document.getElementById('resultTotalPublicCharge').textContent = Math.round(totalPublicCharge).toLocaleString();
+                    
+                    document.getElementById('resultTodayBondRate').textContent = result.todayBondRate;
+                    document.getElementById('resultPrice').textContent = result.price.toLocaleString();
+                    document.getElementById('resultPurchasePrice').textContent = purchasePriceInWon.toLocaleString();
+                    document.getElementById('resultBondPurchaseAmount').textContent = bondPurchaseAmount.toLocaleString();
+                    document.getElementById('results').style.display = 'block';
+                } else {
+                    throw new Error(result.message || '가격 정보를 포함한 유효한 응답을 받지 못했습니다.');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        // 기본 취득세율 계산 함수
+        function calculateBasicAcquisitionTaxRate(price) {
+            if (price <= 600000000) {
+                return 0.01; // 1%
+            } else if (price <= 900000000) {
+                // (매매가액 × 2/3억원 - 3) / 100
+                const rate = (price * (2/3) / 100000000 - 3) / 100;
+                return Math.round(rate * 10000) / 10000; // 소수점 넷째자리까지 반올림
+            } else {
+                return 0.03; // 3%
+            }
+        }
+
+        function displayPrice(data) {
+            const priceElement = document.getElementById('price');
+            const aptNameElement = document.getElementById('aptName');
+            const bondRateElement = document.getElementById('bondRate');
+            
+            if (data.price) {
+                priceElement.textContent = data.price.toLocaleString() + '원';
+                aptNameElement.textContent = `${data.aptName} ${data.dong} ${data.ho} (${data.area})`;
+                bondRateElement.textContent = data.todayBondRate + '%';
+            } else {
+                priceElement.textContent = '조회 실패';
+                aptNameElement.textContent = '';
+                bondRateElement.textContent = '';
+            }
+        }
+    </script>
+</body>
+</html>

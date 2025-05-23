@@ -1,0 +1,14 @@
+{
+  "name": "realty-price-checker",
+  "version": "1.0.0",
+  "description": "Real estate price checker using Node.js",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "puppeteer": "^13.0.0",
+    "body-parser": "^1.19.0"
+  }
+}
